@@ -18,7 +18,7 @@ let masterGain = null, dubDelay = null, dubFeedback = null, reverbNode = null;
 // ═══════════════════════════════════════════════════════════
 let currentBPM = 110;
 // Circle of fifths key offset — 0 = A minor, 7 = E minor, 2 = B minor, etc.
-// Advances by one fifth (7 semitones) each wave from wave 11 onward.
+// Advances by one fifth (7 semitones) every 5 waves (wave 5→Em, 10→Bm, 15→F#m, …).
 let currentKeyOffset = 0;
 const KEY_NAMES = ['Am','Em','Bm','F#m','C#m','G#m','D#m','Bbm','Fm','Cm','Gm','Dm'];
 function updateMusicTempo() {
@@ -181,8 +181,8 @@ function schedulerTick() {
   const step16 = 60 / (currentBPM * 4);
   const LOOKAHEAD = 0.3;
   const wave = (gs.wave || 1) + debugWaveOffset;
-  // Circle of fifths: each wave from 11 onward moves +7 semitones (one fifth)
-  const keyStep = wave <= 10 ? 0 : (wave - 10) % 12;
+  // Circle of fifths: key advances one fifth (+7 semitones) every 5 waves
+  const keyStep = Math.floor(wave / 5) % 12;
   currentKeyOffset = (keyStep * 7) % 12;
 
   // Each wave unlocks one or more new musical elements (waves 1–30)
