@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCALE INVADERS — Powered by Tailscale</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#000;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  font-family:'Courier New',monospace;
+  color:#0ff;
+  user-select:none;
+}
+#game-area {
+  display:flex;
+  flex-direction:row;
+  align-items:flex-start;
+  gap:10px;
+}
+canvas { display:block; max-width:100%; height:auto; border:1px solid #0ff3; }
+#lb-panel {
+  width:160px;
+  min-height:200px;
+  background:rgba(0,0,10,0.85);
+  border:1px solid #0ff4;
+  padding:8px 6px;
+  flex-shrink:0;
+}
+#lb-panel h3 {
+  color:#0ff;
+  font-size:11px;
+  text-align:center;
+  margin-bottom:8px;
+  letter-spacing:1px;
+}
+#lb-entries { list-style:none; }
+#lb-entries li {
+  display:flex;
+  justify-content:space-between;
+  font-size:10px;
+  padding:2px 0;
+  color:#0aa;
+  border-bottom:1px solid #0ff1;
+}
+#lb-entries li.me { color:#ff0; }
+#toolbar {
+  display:flex;
+  align-items:center;
+  gap:16px;
+  margin-top:8px;
+  font-size:12px;
+  color:#aaa;
+}
+#toolbar button {
+  background:#111;
+  color:#0ff;
+  border:1px solid #0ff5;
+  padding:4px 12px;
+  cursor:pointer;
+  font-family:inherit;
+  font-size:12px;
+  border-radius:3px;
+}
+#toolbar button:hover { background:#0ff2; }
+#status { color:#bbb; font-size:11px; }
+
+/* ── Mobile touch controls ──────────────────────────────── */
+#touch-controls {
+  display:none; /* hidden by default — shown only on touch devices */
+  justify-content:center;
+  align-items:center;
+  gap:16px;
+  margin-top:12px;
+}
+.tc-btn {
+  background:#111;
+  color:#0ff;
+  border:2px solid #0ff4;
+  padding:14px 28px;
+  font-size:22px;
+  font-family:inherit;
+  border-radius:8px;
+  cursor:pointer;
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:none;
+}
+.tc-fire {
+  padding:14px 36px;
+  color:#f80;
+  border-color:#f804;
+  font-size:16px;
+  letter-spacing:2px;
+}
+@media (hover:none) and (pointer:coarse) {
+  #touch-controls { display:flex; }
+}
+
+/* ── Loading screen ─────────────────────────────────────── */
+#loading {
+  position:fixed; inset:0; z-index:9999;
+  background:#000;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:18px;
+  font-family:'Courier New',monospace;
+  color:#0ff;
+  transition:opacity 0.5s ease;
+}
+#loading.hide { opacity:0; pointer-events:none; }
+#loading h1 {
+  font-size:clamp(22px,5vw,42px);
+  letter-spacing:6px;
+  text-shadow: 0 0 18px #0ff, 0 0 40px #0cf;
+  animation: ld-pulse 1.8s ease-in-out infinite;
+}
+#loading .sub {
+  font-size:13px; color:#0cf; letter-spacing:2px;
+  text-shadow: 0 0 8px #0cf;
+}
+#loading .msg {
+  font-size:11px; color:#555; margin-top:8px;
+  animation: ld-blink 1.1s step-start infinite;
+}
+.ld-dots { display:flex; gap:10px; margin-top:4px; }
+.ld-dots span {
+  width:8px; height:8px; border-radius:50%;
+  background:#0ff; opacity:0.15;
+  animation: ld-dot 1.2s ease-in-out infinite;
+}
+.ld-dots span:nth-child(2) { animation-delay:.2s; }
+.ld-dots span:nth-child(3) { animation-delay:.4s; }
+@keyframes ld-pulse {
+  0%,100% { text-shadow:0 0 18px #0ff,0 0 40px #0cf; opacity:.9; }
+  50%      { text-shadow:0 0 32px #0ff,0 0 70px #0cf; opacity:1;  }
+}
+@keyframes ld-dot {
+  0%,80%,100% { opacity:.15; transform:scale(1);   }
+  40%         { opacity:1;   transform:scale(1.45); }
+}
+@keyframes ld-blink { 50% { opacity:0; } }
+</style>
+</head>
+<body>
+<div id="loading">
+  <h1>SCALE INVADERS</h1>
+  <div class="sub">POWERED BY TAILSCALE</div>
+  <div class="ld-dots"><span></span><span></span><span></span></div>
+  <div class="msg">Connecting to tailnet…</div>
+</div>
+<div id="game-area">
+<canvas id="game" width="900" height="650"></canvas>
+<div id="lb-panel">
+  <h3>TOP SCORES</h3>
+  <ul id="lb-entries"><li style="color:#333;font-size:10px;text-align:center">no scores yet</li></ul>
+</div>
+</div>
+<div id="toolbar">
+  <span id="status">Connecting…</span>
+  <span style="color:#555">|</span>
+  <span>← → move &nbsp; SPACE fire</span>
+  <span id="invader-hint" style="display:none;color:#f80">↑ ↓ also move you</span>
+  <span style="color:#555">|</span>
+  <button id="soundBtn" onclick="toggleSound()">♪ Music+SFX</button>
+  <button onclick="sendRestart()">↺ Restart</button>
+</div>
+<div id="touch-controls">
+  <button class="tc-btn" id="tc-left">◀</button>
+  <button class="tc-btn tc-fire" id="tc-fire">FIRE</button>
+  <button class="tc-btn" id="tc-right">▶</button>
+</div>
+<script src="game.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+</body>
+</html>
